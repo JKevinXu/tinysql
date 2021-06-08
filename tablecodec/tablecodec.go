@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/pingcap/errors"
@@ -71,8 +72,31 @@ func EncodeRowKeyWithHandle(tableID int64, handle int64) kv.Key {
 
 // DecodeRecordKey decodes the key and gets the tableID, handle.
 func DecodeRecordKey(key kv.Key) (tableID int64, handle int64, err error) {
-	/* Your code here */
-	return
+	if key == nil {
+		return 0, 0, errInvalidRecordKey.GenWithStack("invalid empty record key")
+	}
+
+	buf, h, err := codec.DecodeIntRevised(key)
+	if err != nil {
+		return 0, 0, errors.Trace(err)
+	}
+
+	bufstr := string(buf)
+	if !strings.HasPrefix(bufstr, "t") {
+		return 0, 0, errInvalidRecordKey.GenWithStack("invalid record key")
+	}
+
+	if !strings.HasSuffix(bufstr, "_r") {
+		return 0, 0, errInvalidRecordKey.GenWithStack("invalid record key")
+	}
+
+	tableIdBuf := buf[len(tablePrefix) : len(buf)-len(recordPrefixSep)]
+	_, t_ID, err := codec.DecodeIntRevised(tableIdBuf)
+	if err != nil {
+		return 0, 0, errors.Trace(err)
+	}
+
+	return t_ID, h, nil
 }
 
 // appendTableIndexPrefix appends table index prefix  "t[tableID]_i".
@@ -94,8 +118,18 @@ func EncodeIndexSeekKey(tableID int64, idxID int64, encodedValue []byte) kv.Key 
 
 // DecodeIndexKeyPrefix decodes the key and gets the tableID, indexID, indexValues.
 func DecodeIndexKeyPrefix(key kv.Key) (tableID int64, indexID int64, indexValues []byte, err error) {
-	/* Your code here */
-	return tableID, indexID, indexValues, nil
+	d_indexValues := key[prefixLen+idLen:]
+	dKey, d_idxID, err := codec.DecodeIntRevised(key[:prefixLen+idLen])
+	if err != nil {
+		return 0, 0, []byte{}, errors.Trace(err)
+	}
+
+	dKey = dKey[:len(dKey)-len(indexPrefixSep)]
+	_, d_TableID, err := codec.DecodeIntRevised(dKey)
+	if err != nil {
+		return 0, 0, []byte{}, errors.Trace(err)
+	}
+	return d_TableID, d_idxID, d_indexValues, nil
 }
 
 // DecodeIndexKey decodes the key and gets the tableID, indexID, indexValues.

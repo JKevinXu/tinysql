@@ -63,6 +63,19 @@ func DecodeInt(b []byte) ([]byte, int64, error) {
 	return b, v, nil
 }
 
+// DecodeInt decodes value encoded by EncodeInt before.
+// It returns the leftover un-decoded slice, decoded value if no error.
+func DecodeIntRevised(b []byte) ([]byte, int64, error) {
+	if len(b) < 8 {
+		return nil, 0, errors.New("insufficient bytes to decode value")
+	}
+
+	u := binary.BigEndian.Uint64(b[len(b)-8:])
+	v := DecodeCmpUintToInt(u)
+	b = b[0 : len(b)-8]
+	return b, v, nil
+}
+
 // DecodeIntDesc decodes value encoded by EncodeInt before.
 // It returns the leftover un-decoded slice, decoded value if no error.
 func DecodeIntDesc(b []byte) ([]byte, int64, error) {
